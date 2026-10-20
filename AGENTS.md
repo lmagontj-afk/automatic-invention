@@ -35,3 +35,11 @@ A configuração npm mantém o cache em `/tmp`, sem exigir escrita no diretório
 - `npm test` não exige Docker nem Supabase. Execute também `npm run test:rls` ao alterar migrações/permissões.
 - Clientes Supabase usam a sessão do usuário e a chave pública. Autorize no banco; nenhuma chave privilegiada no app.
 - Cadastros de visitantes também pertencem à congregação anfitriã; `allows_visitor` restringe as partes.
+
+## Motor de sugestão
+
+- Leia `docs/suggestion-review.md` antes de alterar `src/lib/suggest.ts`.
+- Prioridade: máximo de partes preenchidas, depois menor frequência histórica. Não substitua o emparelhamento por uma escolha gulosa sem manter a garantia e os testes exaustivos.
+- Travas inválidas bloqueiam a proposta; edição explícita de elegibilidade pode limpar travas inválidas. Não confunda essas operações.
+- Converta `starts_at` para a data civil no fuso da congregação. Não use `toISOString().slice(0,10)` como data local.
+- Não conte linhas de auditoria como participações: consolide por designação e status. Registros recusados, pendentes e futuros não compõem frequência passada.

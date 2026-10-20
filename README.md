@@ -29,7 +29,13 @@ O manifesto, os ícones originais e o service worker básico estão disponíveis
 
 ## Escopo atual
 
-Etapa 1: base Next.js, TypeScript, Tailwind, tema e estrutura PWA. Banco e motor serão documentados nas próximas etapas.
+Implementadas as etapas 1 a 3:
+
+- Base Next.js, TypeScript, Tailwind, tema claro/escuro e estrutura PWA.
+- Migração PostgreSQL/Supabase, clientes Auth preparados e RLS com testes de integração.
+- Motor puro de sugestão e ranking, com revisão e testes unitários.
+
+As telas de operação e o fluxo de login ainda não foram implementados. A página inicial é apenas a base visual, sem dados reais. Não publique esta etapa como um produto operacional.
 
 Fora desta entrega inicial: telas operacionais, notificações WhatsApp, confirmação/recusa, PDF/imagem e consulta offline. Integração com API oficial do WhatsApp ficará fora do MVP.
 
@@ -67,3 +73,42 @@ npm run test:rls
 ```
 
 Requer Docker em execução e acesso ao Docker Hub na primeira execução. O teste aplica a migração real a um PostgreSQL 17 descartável, assume o papel `authenticated` com UUIDs de sessão fictícios e testa leituras, escritas, escalada de privilégios, telefones, referências cruzadas e invariantes. O bootstrap em `supabase/tests/bootstrap.sql` simula somente `auth.users`/`auth.uid()` e papéis: **não deve ser aplicado no Supabase**. Esse teste valida as políticas no banco, não o fluxo de login, JWT HTTP ou a stack completa hospedada.
+
+## Motor de sugestão (etapa 3)
+
+`src/lib/suggest.ts` exporta `suggest`, `rankCandidates`, `isEligible` e `changePartEligibility`. Não depende do Supabase ou do navegador. [Revisão do algoritmo e limites](docs/suggestion-review.md).
+
+```ts
+import { suggest, type SuggestInput } from "./src/lib/suggest";
+
+const data: SuggestInput = {
+  congregationId: "horizonte-ficticia",
+  meeting: { id: "reuniao-1", congregationId: "horizonte-ficticia", date: "2026-10-21" },
+  members: [{
+    id: "caio", congregationId: "horizonte-ficticia", name: "Caio Exemplo",
+    category: "anciao", active: true, unavailability: [],
+  }],
+  parts: [{ id: "presidente", congregationId: "horizonte-ficticia", meetingId: "reuniao-1", eligibility: "irmaos_batizados" }],
+  existing: [],
+  history: [],
+};
+const proposal = suggest(data);
+// complete: todas as partes preenchidas; partial: faltas explicitadas em unfilled.
+// blocked: trava inválida, com conflicts e SEM assignments para persistir.
+```
+
+Passe datas civis `AAAA-MM-DD` no fuso da congregação, e um registro por designação no histórico (não por evento de auditoria). O motor considera apenas o passado confirmado, descarta outra congregação e não duplica pessoas na reunião. Maximiza o preenchimento antes de equilibrar frequência; recência e ID desempatarão. Travas válidas permanecem; designações destravadas são recalculadas. Uma trava vazia permanece vazia. Uma trava incompatível com os dados atuais exige revisão manual.
+
+Para alterar uma regra, use `changePartEligibility`: o retorno contém partes atualizadas, designações limpas e uma lista de removidos. O banco faz a mesma limpeza ao persistir a regra. Ranking para um seletor considera os outros slots ocupados; o gerador completo pode reorganizar todos os slots destravados. Nenhum retorno deve ser gravado sem sessão, autorização e validação transacional pelo banco.
+
+## Verificações
+
+```sh
+npm run lint
+npm run typecheck
+npm test                # 67 testes; 62 do motor, incluindo 400 cenários contra oráculo exaustivo
+npm run test:rls         # políticas e invariantes no PostgreSQL, com Docker
+npm run build
+```
+
+A CI executa essas verificações. O teste RLS local não substitui a validação futura do login e das chamadas HTTP contra o seu projeto Supabase. Nenhum projeto hospedado foi criado, alterado ou publicado por esta entrega.
