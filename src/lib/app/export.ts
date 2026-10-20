@@ -13,7 +13,7 @@ export function printWeekly(doc: WeeklyDocument) {
   page.documentElement.lang = "pt-BR";
   const style = page.createElement("style");
   style.textContent =
-    "body{font:16px/1.5 Arial,sans-serif;color:#172033;max-width:800px;margin:32px auto;padding:16px}h1{color:#4338ca}h2{margin-top:32px}article{break-inside:avoid;border-bottom:1px solid #ccc;padding:10px 0}p{margin:4px 0}button{min-height:44px;font:inherit;padding:10px 20px;border:2px solid #4338ca;border-radius:8px;background:white;color:#4338ca} @media print{button{display:none}body{margin:0;padding:0}@page{size:A4;margin:16mm}}";
+    "body{font:16px/1.5 Arial,sans-serif;color:#282c2e;max-width:800px;margin:32px auto;padding:16px}h1{color:#8e1939}h2{margin-top:32px}article{break-inside:avoid;border-bottom:1px solid #ccc;padding:10px 0}p{margin:4px 0}button{min-height:44px;font:inherit;padding:10px 20px;border:2px solid #8e1939;border-radius:8px;background:white;color:#8e1939} @media print{button{display:none}body{margin:0;padding:0}@page{size:A4;margin:16mm}}";
   page.head.append(style);
   const add = (parent: HTMLElement, tag: string, text: string) => {
     const element = page.createElement(tag);
@@ -63,7 +63,7 @@ export async function downloadWeeklyPng(doc: WeeklyDocument) {
   ctx = canvas.getContext("2d")!;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#172033";
+  ctx.fillStyle = "#282c2e";
   ctx.font = "28px Arial";
   lines.forEach((line, index) => ctx!.fillText(line, 60, 70 + index * 42));
   const blob = await new Promise<Blob>((resolve, reject) =>

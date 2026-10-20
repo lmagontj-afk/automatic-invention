@@ -46,7 +46,7 @@ export function Week({
         <p className="font-medium text-muted">Uma semana de cada vez</p>
         <h1 className="text-3xl font-bold">Designações</h1>
       </header>
-      <div className="flex flex-wrap items-end gap-2">
+      <div className="week-picker flex flex-wrap items-end gap-3">
         <button
           className={secondary}
           onClick={() => setMonday(addDays(monday, -7))}
@@ -164,9 +164,10 @@ export function MeetingCard({
       );
     }
   }
+  const sections = [...new Set(m.parts.map((part) => part.section))];
   return (
-    <Panel>
-      <div className="flex items-start justify-between gap-3">
+    <Panel className={`meeting-panel ${m.kind === "fim_de_semana" ? "meeting-weekend" : ""}`}>
+      <div className="meeting-heading flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold text-accent">{kindLabels[m.kind]}</p>
           <h2 className="mt-1 text-xl font-bold">{m.title}</h2>
@@ -213,7 +214,7 @@ export function MeetingCard({
           ))}
         </ul>
       )}
-      <div className="mt-4 divide-y divide-muted/20">
+      <div className="mt-4">
         {m.parts.map((p, index) => {
           const a = draft.find((a) => a.partId === p.id)!,
             stored = data.assignments.find((a) => a.partId === p.id),
@@ -222,8 +223,8 @@ export function MeetingCard({
             ranked = rankCandidates(input, p.id),
             recommended = new Set(ranked.slice(0, 3).map((r) => r.memberId));
           return (
-            <article key={p.id} className="py-5">
-              <p className="font-medium text-muted">{p.section}</p>
+            <article key={p.id} className="part-card" data-tone={["slate", "gold", "wine"][sections.indexOf(p.section) % 3]}>
+              <p className="part-section">{p.section}</p>
               <h3 className="mt-1 font-bold">
                 {index + 1}. {p.title}
               </h3>

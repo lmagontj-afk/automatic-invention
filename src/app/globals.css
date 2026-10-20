@@ -1,10 +1,57 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
-:root { color-scheme: light; --background: #f7f8fc; --foreground: #172033; --surface: #ffffff; --muted: #49556a; --accent: #4338ca; }
-:root.dark { color-scheme: dark; --background: #101626; --foreground: #edf0f9; --surface: #1c2538; --muted: #bec8dc; --accent: #b1a9ff; }
-@theme inline { --color-background: var(--background); --color-foreground: var(--foreground); --color-surface: var(--surface); --color-muted: var(--muted); --color-accent: var(--accent); }
+:root {
+  color-scheme: light;
+  --background: #f6f4f0;
+  --foreground: #282c2e;
+  --surface: #ffffff;
+  --muted: #596267;
+  --accent: #8e1939;
+  --gold: #bc8627;
+  --slate: #626e73;
+  --line: #dedbd5;
+}
+:root.dark {
+  color-scheme: dark;
+  --background: #19191b;
+  --foreground: #f5f1ec;
+  --surface: #242427;
+  --muted: #c3c0bb;
+  --accent: #ffadc3;
+  --gold: #e1b75e;
+  --slate: #b3c0c5;
+  --line: #454347;
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+}
 body { background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; }
+h1, h2, h3 { letter-spacing: -0.025em; text-wrap: balance; }
 button, a, input, select { min-height: 44px; }
 button { cursor: pointer; }
+button, a, input, select { transition: background-color 150ms, border-color 150ms, box-shadow 150ms; }
+button:disabled { cursor: not-allowed; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.app-header { border-bottom: 1px solid var(--line); padding-bottom: 20px; }
+.brand-mark { background: #8e1939; color: white; box-shadow: 0 4px 12px #8e193920; border-bottom: 4px solid var(--gold); }
+.login-intro { border-left: 4px solid var(--gold); padding-left: 20px; }
+.app-panel { box-shadow: 0 3px 18px #282c2e06; }
+.app-primary:hover:not(:disabled) { filter: brightness(0.93); }
+.app-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--muted) 8%, var(--surface)); }
+.week-picker { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); padding: 16px; }
+.meeting-panel { border-top: 4px solid var(--slate); }
+.meeting-weekend { border-top-color: var(--gold); }
+.meeting-heading { border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.part-card { margin-top: 16px; border: 1px solid var(--line); border-radius: 16px; padding: 0 16px 20px; overflow: hidden; }
+.part-section { margin: 0 -16px 16px; padding: 10px 16px; background: var(--slate); color: var(--background); font-weight: 700; }
+.part-card[data-tone="gold"] .part-section { background: var(--gold); color: #241b0c; }
+.part-card[data-tone="wine"] .part-section { background: #8e1939; color: white; }
+:root:not(.dark) .part-card[data-tone="slate"] .part-section { color: white; }
+.app-nav { box-shadow: 0 -4px 24px #282c2e08; }
+.nav-icon { display: flex; align-items: center; justify-content: center; width: 52px; height: 30px; border-radius: 12px; }
+[aria-current="page"] .nav-icon { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }

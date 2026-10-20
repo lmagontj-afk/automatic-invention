@@ -20,15 +20,16 @@ import { friendlyError, localDate, mondayOf } from "@/lib/app/domain";
 import { execute, loadWorkspace, membership } from "@/lib/app/repository";
 import type { Command, Membership, Workspace } from "@/lib/app/types";
 import { Members } from "./members";
+import { NavigationIcon } from "./navigation-icon";
 import { Week } from "./week";
 import { Settings } from "./settings";
 import { History } from "./history";
 import { button, field, Label, Panel, secondary } from "./ui";
 const navigation = [
-  ["week", "Semana", "▦"],
-  ["members", "Irmãos", "♙"],
-  ["history", "Histórico", "◷"],
-  ["settings", "Ajustes", "⚙"],
+  ["week", "Semana"],
+  ["members", "Irmãos"],
+  ["history", "Histórico"],
+  ["settings", "Ajustes"],
 ] as const;
 export function Application() {
   const lastUser = useRef<string | null>(null);
@@ -324,16 +325,16 @@ export function Application() {
   return (
     <>
       <div className="mx-auto max-w-3xl px-4 pb-28 pt-6 sm:px-6">
-        <header className="mb-7 flex flex-wrap items-center justify-between gap-3">
+        <header className="app-header mb-7 flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/"
             className="flex items-center gap-3 font-bold tracking-tight"
           >
             <span
-              className="flex size-11 items-center justify-center rounded-xl bg-accent text-2xl text-white dark:text-background"
+              className="brand-mark flex size-12 items-center justify-center rounded-2xl"
               aria-hidden="true"
             >
-              ▦
+              <NavigationIcon name="week" />
             </span>
             Quadro semanal
           </Link>
@@ -389,7 +390,7 @@ export function Application() {
         )}
         {!data ? (
           <main id="conteudo" className="space-y-6">
-            <div className="py-4">
+            <div className="login-intro my-8 py-2">
               <p className="font-semibold text-accent">
                 Cada parte, no seu lugar.
               </p>
@@ -572,18 +573,18 @@ export function Application() {
       {data && (
         <nav
           aria-label="Navegação principal"
-          className="fixed inset-x-0 bottom-0 z-10 border-t border-muted/20 bg-surface pb-[env(safe-area-inset-bottom)]"
+          className="app-nav fixed inset-x-0 bottom-0 z-10 border-t border-muted/20 bg-surface pb-[env(safe-area-inset-bottom)]"
         >
           <div className="mx-auto grid max-w-3xl grid-cols-4">
-            {navigation.map(([key, label, icon]) => (
+            {navigation.map(([key, label]) => (
               <button
                 key={key}
-                className={`flex min-h-20 flex-col items-center justify-center gap-1 px-1 py-2 font-semibold ${tab === key ? "bg-accent/10 text-accent" : "text-muted"}`}
+                className={`flex min-h-20 flex-col items-center justify-center gap-1 px-1 py-2 font-semibold ${tab === key ? "text-accent" : "text-muted"}`}
                 aria-current={tab === key ? "page" : undefined}
                 onClick={() => setTab(key)}
               >
-                <span aria-hidden="true" className="text-2xl">
-                  {icon}
+                <span aria-hidden="true" className="nav-icon">
+                  <NavigationIcon name={key} />
                 </span>
                 <span>{label}</span>
               </button>

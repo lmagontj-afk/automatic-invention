@@ -1,5 +1,5 @@
 /* Cache contains only this public, static read-only viewer, never API/auth data. */
-const CACHE = "quadro-shell-v3";
+const CACHE = "quadro-shell-v4";
 const ASSETS = ["/offline.html", "/offline.js", "/icons/icon-192.png"];
 self.addEventListener("install", (event) => {
   event.waitUntil(
