@@ -1,0 +1,53 @@
+begin;
+create function pg_temp.id(label text) returns uuid language sql immutable as $$ select md5(label)::uuid $$;
+create function pg_temp.ok(ok boolean,label text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'FAIL: %',label; end if; raise notice 'PASS: %',label; end $$;
+create function pg_temp.fails(statement text,expected text,label text) returns void language plpgsql as $$
+begin begin execute statement; exception when others then if sqlstate=expected then raise notice 'PASS: %',label; return; end if; raise exception 'FAIL: % (%: %)',label,sqlstate,sqlerrm; end; raise exception 'FAIL: % (allowed)',label;end $$;
+insert into auth.users values(pg_temp.id('admin')), (pg_temp.id('brother'));
+insert into public.congregations(id,name) values(pg_temp.id('c'),'Horizonte fictícia'),(pg_temp.id('other'),'Jardim fictícia');
+insert into public.members(id,congregation_id,name,category) values(pg_temp.id('m1'),pg_temp.id('c'),'Caio Exemplo','anciao'),(pg_temp.id('m2'),pg_temp.id('c'),'Luan Exemplo','irmao_batizado');
+insert into public.congregation_memberships values(pg_temp.id('c'),pg_temp.id('admin'),pg_temp.id('m1'),'administrador'),(pg_temp.id('c'),pg_temp.id('brother'),pg_temp.id('m2'),'irmao');
+insert into public.meeting_templates(id,congregation_id,name,kind,weekday,local_time) values(pg_temp.id('t'),pg_temp.id('c'),'Modelo fictício','meio_de_semana',3,'19:30');
+insert into public.template_parts(id,congregation_id,template_id,section,title,position,eligibility) values
+(pg_temp.id('p1'),pg_temp.id('c'),pg_temp.id('t'),'Abertura','Presidente',0,'irmaos_batizados'),
+(pg_temp.id('p2'),pg_temp.id('c'),pg_temp.id('t'),'Estudo','Leitor',1,'irmaos_batizados'),
+(pg_temp.id('p3'),pg_temp.id('c'),pg_temp.id('t'),'Encerramento','Oração',2,'irmaos_batizados');
+set local role authenticated;
+select set_config('request.jwt.claim.sub',pg_temp.id('admin')::text,true);
+select public.save_member(pg_temp.id('c'),pg_temp.id('m2'),'Luan Exemplo','irmao_batizado',true,false,'5511000000002');
+select pg_temp.ok((select whatsapp='5511000000002' from public.member_phones where member_id=pg_temp.id('m2')),'cadastro e telefone salvos atomicamente');
+select pg_temp.fails($q$select public.save_member(pg_temp.id('c'),pg_temp.id('m2'),'Nome não deve mudar','irmao_batizado',true,false,'inválido')$q$,'23514','telefone inválido desfaz alteração do nome');
+select pg_temp.ok((select name='Luan Exemplo' from public.members where id=pg_temp.id('m2')),'rollback do cadastro confirmado');
+select pg_temp.fails($q$select public.save_member(pg_temp.id('other'),null,'Intruso','anciao',true,false,null)$q$,'42501','RPC não grava em outra congregação');
+select public.create_week(pg_temp.id('c'),'2035-03-19');
+select public.create_week(pg_temp.id('c'),'2035-03-19');
+select pg_temp.ok((select count(*)=1 from public.meetings),'criação de semana é idempotente');
+select pg_temp.ok((select starts_at='2035-03-21 22:30Z'::timestamptz from public.meetings),'horário local convertido pelo fuso da congregação');
+select pg_temp.ok((select count(*)=3 from public.meeting_parts),'partes copiadas transacionalmente');
+select pg_temp.fails($q$select public.create_week(pg_temp.id('c'),'2035-03-20')$q$,'P0001','semana precisa começar na segunda');
+select set_config('test.mid',(select id::text from public.meetings),true);
+select set_config('test.proposal',(select jsonb_agg(jsonb_build_object('part_id',id,'member_id',case position when 0 then pg_temp.id('m1') when 1 then pg_temp.id('m2') else null end,'locked',position=2))::text from public.meeting_parts),true);
+select set_config('test.revision',(select revision::text from public.meetings),true);
+select public.save_assignments(pg_temp.id('c'),current_setting('test.mid')::uuid,current_setting('test.revision')::bigint,current_setting('test.proposal')::jsonb);
+select pg_temp.ok((select count(*)=2 from public.assignments),'proposta completa salva');
+select pg_temp.ok((select empty_locked from public.meeting_parts where position=2),'trava vazia persistida');
+select pg_temp.fails($q$select public.save_assignments(pg_temp.id('c'),current_setting('test.mid')::uuid,current_setting('test.revision')::bigint,current_setting('test.proposal')::jsonb)$q$,'40001','revisão antiga não sobrescreve o quadro');
+update public.assignments set status='confirmada' where member_id=pg_temp.id('m1');
+select set_config('test.assignment',(select id::text from public.assignments where member_id=pg_temp.id('m1')),true);
+select public.save_assignments(pg_temp.id('c'),current_setting('test.mid')::uuid,(select revision from public.meetings),current_setting('test.proposal')::jsonb);
+select pg_temp.ok((select id::text=current_setting('test.assignment') and status='confirmada' from public.assignments where member_id=pg_temp.id('m1')),'salvar pessoa inalterada preserva ID e confirmação');
+select pg_temp.fails($q$select public.save_assignments(pg_temp.id('c'),current_setting('test.mid')::uuid,(select revision from public.meetings),null)$q$,'P0001','proposta SQL null é rejeitada');
+select pg_temp.ok((select count(*)=2 from public.assignments),'proposta inválida não apaga designações');
+select pg_temp.fails($q$select public.save_assignments(pg_temp.id('c'),current_setting('test.mid')::uuid,(select revision from public.meetings),'[]')$q$,'P0001','proposta incompleta é rejeitada');
+select set_config('test.duplicate',(select jsonb_agg(jsonb_build_object('part_id',id,'member_id',pg_temp.id('m1'),'locked',false))::text from public.meeting_parts),true);
+select pg_temp.fails($q$select public.save_assignments(pg_temp.id('c'),current_setting('test.mid')::uuid,(select revision from public.meetings),current_setting('test.duplicate')::jsonb)$q$,'23505','duplicação em proposta é revertida atomicamente');
+select pg_temp.ok((select count(*)=2 from public.assignments),'rollback da proposta preserva quadro anterior');
+select public.save_template(pg_temp.id('c'),pg_temp.id('t'),'Modelo revisado','meio_de_semana',4::smallint,'20:00',jsonb_build_array(jsonb_build_object('id',pg_temp.id('p1'),'section','Abertura','title','Presidente','position',0,'slot','titular','eligibility','somente_anciaos')));
+select pg_temp.ok((select count(*)=1 from public.template_parts where active),'remoção de parte do modelo mantém referências históricas');
+select pg_temp.ok((select count(*)=3 from public.meeting_parts),'edição do modelo não destrói reunião existente');
+select pg_temp.fails($q$select public.save_template(pg_temp.id('c'),pg_temp.id('t'),'Inválido','meio_de_semana',4::smallint,'20:00',null)$q$,'P0001','modelo SQL null é rejeitado');
+select set_config('request.jwt.claim.sub',pg_temp.id('brother')::text,true);
+select pg_temp.fails($q$select public.create_week(pg_temp.id('c'),'2035-03-19')$q$,'42501','irmão não cria semana via RPC');
+select pg_temp.fails($q$select public.save_assignments(pg_temp.id('c'),current_setting('test.mid')::uuid,0,'[]')$q$,'42501','irmão não grava proposta via RPC');
+select pg_temp.fails($q$select public.save_member(pg_temp.id('c'),pg_temp.id('m2'),'Alteração indevida','anciao',true,false,null)$q$,'42501','irmão não altera categoria via RPC');
+rollback;

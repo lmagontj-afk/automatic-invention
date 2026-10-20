@@ -29,7 +29,7 @@ try {
   if (!ready) throw new Error("PostgreSQL não iniciou; confira o Docker e execute npm run test:rls novamente.");
   sql(readFileSync("supabase/tests/bootstrap.sql", "utf8"));
   for (const file of readdirSync("supabase/migrations").filter(f => f.endsWith(".sql")).sort()) sql(readFileSync(`supabase/migrations/${file}`, "utf8"));
-  sql(readFileSync("supabase/tests/rls.sql", "utf8"));
+  for (const file of ["rls.sql", "workflows.sql"]) sql(readFileSync(`supabase/tests/${file}`, "utf8"));
   console.log("RLS: todos os cenários e invariantes passaram no PostgreSQL 17.");
 } catch (error) {
   console.error(error.message);

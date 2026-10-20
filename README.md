@@ -112,3 +112,19 @@ npm run build
 ```
 
 A CI executa essas verificações. O teste RLS local não substitui a validação futura do login e das chamadas HTTP contra o seu projeto Supabase. Nenhum projeto hospedado foi criado, alterado ou publicado por esta entrega.
+
+## Telas e persistência (etapa 4)
+
+A tela Semana gera as reuniões a partir dos modelos, oferece busca de pessoas, destaques de sugestões, travas e conflitos no rascunho. **Salve a reunião** para gravar as escolhas. Regras são salvas imediatamente e removem ocupantes incompatíveis. Irmãos cadastra pessoas e indisponibilidades; Histórico apresenta a auditoria; Ajustes permite editar modelos e vincular contas Auth a perfis.
+
+Aplique também `202610200002_workflows.sql`. As RPCs de cadastro, modelos, criação da semana e designações são transacionais e executam com as permissões do usuário. A gravação do quadro exige a revisão atual da reunião; se outro editor alterar os dados, atualize antes de tentar de novo. As cópias de reuniões mantêm títulos e horários anteriores; a regra do modelo propaga para o futuro. Partes retiradas de um modelo são desativadas, preservando referências antigas.
+
+O login usa e-mail/senha do Supabase Auth. Crie as contas pelo painel antes de vinculá-las; cadastro público permanece desabilitado. O callback PKCE usa `/auth/callback`, que deve constar das URLs permitidas. Recuperação/invites são administrados pelo painel do Supabase neste MVP.
+
+Sem configuração, **Abrir demonstração** permite experimentar as telas com dados fictícios em memória. A demonstração não grava no banco e perde as alterações ao sair/recarregar. Telefones demonstrativos ficam vazios.
+
+```sh
+npm run test:e2e
+```
+
+Os testes Playwright exercitam os fluxos em Chromium com viewport de celular. Use o Chromium instalado ou `npx playwright install chromium` (Linux pode precisar de `npx playwright install --with-deps chromium`). Para indicar outro executável, defina `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Os testes de UI usam a demonstração; autorização e transações são exercitadas separadamente no PostgreSQL. O login HTTP no Supabase hospedado precisa ser validado após configurar seu projeto.

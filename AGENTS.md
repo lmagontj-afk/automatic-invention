@@ -26,7 +26,7 @@ A configuração npm mantém o cache em `/tmp`, sem exigir escrita no diretório
 - Nenhum segredo no cliente ou no Git. Nunca use service role no navegador.
 - O isolamento das congregações e as permissões devem ser garantidos por RLS no banco, não apenas pela interface.
 - Não instale dependências sem necessidade. Preserve o lockfile com `npm ci`.
-- Não implemente etapas 4+ sem nova solicitação do usuário.
+- Etapas 4 a 7 autorizadas. Valide e faça um commit por etapa. Nenhum envio automático de mensagem ou publicação sem autorização.
 
 ## Banco
 
@@ -43,3 +43,18 @@ A configuração npm mantém o cache em `/tmp`, sem exigir escrita no diretório
 - Travas inválidas bloqueiam a proposta; edição explícita de elegibilidade pode limpar travas inválidas. Não confunda essas operações.
 - Converta `starts_at` para a data civil no fuso da congregação. Não use `toISOString().slice(0,10)` como data local.
 - Não conte linhas de auditoria como participações: consolide por designação e status. Registros recusados, pendentes e futuros não compõem frequência passada.
+
+## Navegador
+
+- `npm run test:e2e`: Playwright em viewport de celular. Usa Chromium de `/usr/bin/chromium` quando disponível; alternativa: `npx playwright install chromium`, ou `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+- A demonstração é explicitamente fictícia e não grava dados no Supabase. A segurança real é verificada nos testes SQL.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
