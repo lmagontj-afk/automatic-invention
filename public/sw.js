@@ -1,5 +1,5 @@
 /* Cache contains only this public, static read-only viewer, never API/auth data. */
-const CACHE = "quadro-shell-v2";
+const CACHE = "quadro-shell-v3";
 const ASSETS = ["/offline.html", "/offline.js", "/icons/icon-192.png"];
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -52,4 +52,22 @@ self.addEventListener("fetch", (event) => {
       }),
     );
   }
+});
+
+// A page controlled by an old worker must not claim readiness merely because
+// navigator.serviceWorker.controller exists. Verify every public viewer asset.
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "OFFLINE_READY" || !event.ports[0]) return;
+  const port = event.ports[0];
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      for (const asset of ASSETS) {
+        if (!(await cache.match(asset))) await cache.add(asset);
+      }
+      port.postMessage({ type: "OFFLINE_READY", version: 3, ready: true });
+    })().catch(() =>
+      port.postMessage({ type: "OFFLINE_READY", version: 3, ready: false }),
+    ),
+  );
 });

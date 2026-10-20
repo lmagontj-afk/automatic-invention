@@ -63,6 +63,7 @@ function save(data: Workspace, m: Meeting, rows: Assignment[]) {
 }
 function revalidate(data: Workspace) {
   for (const m of data.meetings) {
+    if (new Date(m.startsAt) <= new Date()) continue;
     const date = localDate(m.startsAt, data.congregation.timezone);
     const rows = engineInput(data, m).existing.map((a) => {
       const person = data.members.find((p) => p.id === a.memberId),
@@ -122,7 +123,10 @@ export function applyDemo(workspace: Workspace, command: Command): Workspace {
       ))
         for (const p of m.parts) {
           const templatePart = v.parts.find((t) => t.id === p.templatePartId);
-          if (templatePart) p.eligibility = templatePart.eligibility;
+          if (templatePart) {
+            p.eligibility = templatePart.eligibility;
+            p.allowsVisitor = templatePart.allowsVisitor;
+          }
         }
       revalidate(data);
       break;

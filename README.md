@@ -44,10 +44,10 @@ Preencha `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUB
    commit;
    ```
 
-5. Entre no app. Em **Irmãos**, cadastre pessoas, categorias e indisponibilidades. Em **Ajustes**, crie/edite os dois modelos e associe outras contas Auth aos cadastros e perfis. O administrador gerencia vínculos; o designador organiza as reuniões. Evite remover ou rebaixar seu único administrador; a recuperação desse acesso requer o SQL Editor.
+5. Entre no app. Em **Irmãos**, cadastre pessoas, categorias e indisponibilidades. Em **Ajustes**, crie/edite os dois modelos e associe outras contas Auth aos cadastros e perfis. O administrador gerencia vínculos; o designador organiza as reuniões. O banco impede remover ou rebaixar o último administrador. Promova outra pessoa antes de transferir esse acesso.
 6. Na tela **Semana**, selecione a semana e use **Criar reuniões da semana**. A operação é idempotente para cada modelo/horário: repetir não apaga o quadro existente. A migração registra a tabela `meetings` na publicação `supabase_realtime`, quando ela existe, para avisar sobre alterações concorrentes. O botão Atualizar continua disponível mesmo sem Realtime.
 
-As migrações são: `202610200001_initial.sql` (domínio e RLS), `202610200002_workflows.sql` (transações, revisões e modelos) e `202610200003_responses.sql` (respostas restritas).
+As migrações são: `202610200001_initial.sql` (domínio e RLS), `202610200002_workflows.sql` (transações, revisões e modelos), `202610200003_responses.sql` (respostas restritas) e `202610200004_preserve_history_and_admin.sql` (preservação do passado e proteção do último administrador).
 
 ## Usar o quadro
 
@@ -107,7 +107,7 @@ npm run build
 
 - **Vitest:** domínio, elegibilidade, motor, notificações, datas, exportações e escopo/expiração offline. O motor foi comparado com busca exaustiva independente em 400 cenários, com e sem travas.
 - **RLS/transações/respostas:** requer Docker ativo e acesso ao Docker Hub na primeira execução. Aplica as migrações reais em PostgreSQL 17 descartável, sem portas externas, e assume o papel `authenticated` com UUIDs fictícios. Testa isolamento, telefones, escalada de privilégios, vínculos cruzados, rollback, idempotência, concorrência por revisão e respostas próprias. O container é removido ao terminar.
-- **Playwright:** Chromium com viewport de celular, sugestões, conflitos, cadastros, regras, confirmação/recusa/substituição, PNG, impressão/PDF e perda de rede real, além de expiração e exclusão de cópias. Usa a demonstração. Se necessário, instale o navegador com `npx playwright install --with-deps chromium`, ou informe `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Chromium em `/usr/bin/chromium` é detectado automaticamente.
+- **Playwright:** Chromium com viewport de celular, sugestões, conflitos, cadastros, regras, confirmação/recusa/substituição, PNG, impressão/PDF e perda de rede real, além de expiração e exclusão de cópias. Usa a demonstração e respostas HTTP fictícias para verificar troca de congregação e mudança de perfil com requisições em andamento. O servidor de teste usa um endpoint Supabase fictício e nunca recebe credenciais reais. Se necessário, instale o navegador com `npx playwright install --with-deps chromium`, ou informe `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Chromium em `/usr/bin/chromium` é detectado automaticamente.
 
 `supabase/tests/bootstrap.sql` simula somente os papéis e `auth.users`/`auth.uid()` do Supabase. **Nunca o aplique no projeto real.** Os testes SQL validam políticas no banco, mas não substituem uma validação HTTP do login, das chamadas RPC e do Realtime no seu Supabase. Essa validação requer seu projeto configurado. Nenhum projeto hospedado foi criado, modificado ou publicado nesta implementação.
 
@@ -126,3 +126,11 @@ A CI executa lint, tipos, Vitest, SQL, Playwright e build. Convenções e comand
 - Otimização global entre semanas, regras de parentesco/pares preferidos e controle de comparecimento efetivo.
 - Cadastro público, gestão de convites/senhas dentro do app e provisionamento autônomo de congregações.
 - Edição/sincronização offline e revogação remota instantânea de cópias desconectadas.
+
+## Correções de integridade e acesso
+
+Aplique também `202610200004_preserve_history_and_admin.sql` caso já tenha aplicado as três migrações anteriores. Mudanças de categoria, atividade, disponibilidade e fuso revalidam reuniões futuras e preservam participações passadas para o histórico. Uma edição explícita de regra de uma parte continua removendo ocupantes inelegíveis, inclusive travados. A migração não reconstrói participações já removidas por versões anteriores. O último administrador não pode se rebaixar ou remover o próprio vínculo; a transferência continua permitida quando há outro administrador.
+
+O carregamento consulta o vínculo atual no banco, pagina os resultados mesmo quando o servidor reduz seu limite de linhas e descarta resultados de requisições antigas após troca de usuário, congregação ou perfil. Formulários de edição anteriores também são descartados quando o acesso muda. A demonstração acompanha a preservação do passado e propaga tanto a regra quanto a permissão de visitantes dos modelos.
+
+O salvamento offline exige confirmação do worker de que todos os arquivos do visualizador estão disponíveis. Um worker antigo sem esse protocolo não produz confirmação de sucesso. Apagar a cópia ou trocar de acesso cancela também uma gravação local ainda em andamento.

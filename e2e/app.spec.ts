@@ -222,3 +222,29 @@ test("sair apaga a cópia offline e uma cópia expirada não exibe nomes", async
     await page.evaluate(() => localStorage.getItem("quadro-offline-v1")),
   ).toBeNull();
 });
+
+test("worker antigo sem suporte offline não produz confirmação falsa", async ({
+  page,
+}) => {
+  // Emulate a legacy controller that has no readiness message protocol. Browser
+  // routing does not reliably intercept requests for the worker's main script.
+  await page.evaluate(() =>
+    Object.defineProperty(navigator.serviceWorker, "controller", {
+      configurable: true,
+      get: () => ({ postMessage: () => undefined }),
+    }),
+  );
+  await page.getByText("Consultar sem internet", { exact: true }).click();
+  await page
+    .getByRole("checkbox", { name: /Este dispositivo é de confiança/ })
+    .check();
+  await page.getByRole("button", { name: "Salvar semana offline" }).click();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "consulta offline ainda não está pronta" }),
+  ).toBeVisible({ timeout: 15_000 });
+  expect(
+    await page.evaluate(() => localStorage.getItem("quadro-offline-v1")),
+  ).toBeNull();
+});

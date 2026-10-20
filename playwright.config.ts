@@ -19,7 +19,14 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --port 3100",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
+    // Fictitious endpoint intercepted by the authenticated UI regression tests.
+    // No real Supabase credentials or project are used by the browser suite.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+        "sb_publishable_fictitious_test_key",
+    },
     timeout: 120_000,
   },
 });

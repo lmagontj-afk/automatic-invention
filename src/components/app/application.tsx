@@ -12,6 +12,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { RequestScope } from "@/lib/app/request-scope";
 import { createClient } from "@/lib/supabase/client";
 import { createDemo, applyDemo, brotherView } from "@/lib/app/demo";
 import { friendlyError, localDate, mondayOf } from "@/lib/app/domain";
@@ -30,6 +31,9 @@ const navigation = [
 ] as const;
 export function Application() {
   const lastUser = useRef<string | null>(null);
+  const requests = useRef(new RequestScope());
+  const workspaceScope = useRef<string | null>(null);
+  const demoMode = useRef(false);
   const errorPanel = useRef<HTMLDivElement>(null);
   const [client] = useState(() =>
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -48,6 +52,32 @@ export function Application() {
     [tab, setTab] = useState<(typeof navigation)[number][0]>("week"),
     [monday, setMonday] = useState(""),
     [online, setOnline] = useState(true);
+  const invalidateContext = useCallback(() => {
+    requests.current.invalidate();
+    workspaceScope.current = null;
+    clearOfflineSnapshot();
+    setBusy(false);
+  }, []);
+  const acceptWorkspace = useCallback(
+    (next: Workspace) => {
+      const scope = JSON.stringify([
+        next.membership.userId,
+        next.congregation.id,
+        next.membership.memberId,
+        next.membership.role,
+      ]);
+      if (workspaceScope.current !== null && workspaceScope.current !== scope)
+        invalidateContext();
+      workspaceScope.current = scope;
+      retainSnapshotForScope(
+        next.membership.userId,
+        next.congregation.id,
+        next.membership.role,
+      );
+      setData(next);
+    },
+    [invalidateContext],
+  );
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     window.addEventListener("online", update);
@@ -62,33 +92,38 @@ export function Application() {
   }, [error]);
   useEffect(() => {
     if (!client) return;
-    void client.auth
-      .getUser()
-      .then(({ data }) => setUser(data.user?.id ?? null));
+    const scope = requests.current;
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((_event, session) => {
       const next = session?.user.id ?? null;
-      retainSnapshotForUser(next);
+      if (!demoMode.current) retainSnapshotForUser(next);
       if (next !== lastUser.current) {
-        setData(null);
-        setSelected(null);
-        setChoices([]);
+        if (!demoMode.current) {
+          invalidateContext();
+          setData(null);
+          setSelected(null);
+          setChoices([]);
+        }
         lastUser.current = next;
       }
       setUser(next);
     });
-    return () => subscription.unsubscribe();
-  }, [client]);
+    return () => {
+      subscription.unsubscribe();
+      scope.invalidate();
+    };
+  }, [client, invalidateContext]);
   useEffect(() => {
     if (!client || !user || demo) return;
     let cancelled = false;
+    const current = requests.current.capture();
     void client
       .from("congregation_memberships")
       .select("*")
       .eq("user_id", user)
       .then(({ data, error }) => {
-        if (cancelled) return;
+        if (cancelled || !current()) return;
         if (error) {
           setError(friendlyError(error));
           return;
@@ -107,34 +142,32 @@ export function Application() {
   }, [client, user, demo]);
   const refresh = useCallback(async () => {
     if (!client || !selected || demo) return;
+    const current = requests.current.begin();
     setBusy(true);
     setError("");
     try {
       const next = await loadWorkspace(client, selected);
-      retainSnapshotForScope(
-        next.membership.userId,
-        next.congregation.id,
-        next.membership.role,
-      );
-      setData(next);
+      if (current()) acceptWorkspace(next);
     } catch (e) {
-      setError(friendlyError(e));
+      if (current()) {
+        if ((e as { code?: string }).code === "42501") {
+          invalidateContext();
+          setData(null);
+        }
+        setError(friendlyError(e));
+      }
     } finally {
-      setBusy(false);
+      if (current()) setBusy(false);
     }
-  }, [client, selected, demo]);
+  }, [client, selected, demo, acceptWorkspace, invalidateContext]);
   useEffect(() => {
     let cancelled = false;
     if (!client || !selected || demo) return;
+    const current = requests.current.begin();
     void loadWorkspace(client, selected)
       .then((next) => {
-        if (!cancelled) {
-          retainSnapshotForScope(
-            next.membership.userId,
-            next.congregation.id,
-            next.membership.role,
-          );
-          setData(next);
+        if (!cancelled && current()) {
+          acceptWorkspace(next);
           setMonday(
             mondayOf(
               localDate(new Date().toISOString(), next.congregation.timezone),
@@ -143,15 +176,21 @@ export function Application() {
         }
       })
       .catch((e) => {
-        if (!cancelled) setError(friendlyError(e));
+        if (!cancelled && current()) {
+          if ((e as { code?: string }).code === "42501") {
+            invalidateContext();
+            setData(null);
+          }
+          setError(friendlyError(e));
+        }
       })
       .finally(() => {
-        if (!cancelled) setBusy(false);
+        if (!cancelled && current()) setBusy(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [client, selected, demo]);
+  }, [client, selected, demo, acceptWorkspace, invalidateContext]);
   useEffect(() => {
     if (!client || !selected || demo) return;
     const channel = client
@@ -183,39 +222,44 @@ export function Application() {
       return false;
     }
     if (!data || busy) return false;
+    const current = requests.current.begin();
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      if (demo) setData(applyDemo(data, command));
+      if (demo) acceptWorkspace(applyDemo(data, command));
       else {
         if (!client || !selected)
           throw new Error("Entre novamente para salvar.");
         await execute(client, data.congregation.id, command);
+        if (!current()) return false;
         try {
           const next = await loadWorkspace(client, selected);
-          retainSnapshotForScope(
-            next.membership.userId,
-            next.congregation.id,
-            next.membership.role,
-          );
-          setData(next);
+          if (!current()) return false;
+          acceptWorkspace(next);
         } catch (e) {
+          if (!current()) return false;
+          if ((e as { code?: string }).code === "42501") {
+            invalidateContext();
+            setData(null);
+          }
           setError(
             `A alteração foi salva, mas os dados não puderam ser atualizados. Use Atualizar antes de editar novamente. ${friendlyError(e)}`,
           );
           return true;
         }
       }
+      if (!current()) return true;
       setMessage(
         `${success}${demo ? " Apenas na demonstração; nenhum dado foi enviado." : ""}`,
       );
       return true;
     } catch (e) {
+      if (!current()) return false;
       setError(friendlyError(e));
       return false;
     } finally {
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   async function login(e: FormEvent<HTMLFormElement>) {
@@ -241,7 +285,7 @@ export function Application() {
     }
   }
   async function logout() {
-    clearOfflineSnapshot();
+    invalidateContext();
     if (client && !demo) {
       setBusy(true);
       const { error } = await client.auth.signOut();
@@ -253,6 +297,8 @@ export function Application() {
         return;
       }
     }
+    clearOfflineSnapshot();
+    demoMode.current = false;
     setData(null);
     setDemo(false);
     setSelected(null);
@@ -262,13 +308,14 @@ export function Application() {
     setBusy(false);
   }
   function startDemo() {
-    clearOfflineSnapshot();
+    invalidateContext();
+    demoMode.current = true;
     const week = mondayOf(
       localDate(new Date().toISOString(), "America/Sao_Paulo"),
     );
     setMonday(week);
     setDemo(true);
-    setData(createDemo(week));
+    acceptWorkspace(createDemo(week));
     setMessage(
       "Demonstração aberta. Todos os nomes são fictícios e as alterações duram até sair ou recarregar.",
     );
@@ -431,8 +478,8 @@ export function Application() {
                 <button
                   className={secondary}
                   onClick={() => {
-                    clearOfflineSnapshot();
-                    setData({
+                    invalidateContext();
+                    acceptWorkspace({
                       ...data,
                       membership: {
                         ...data.membership,
@@ -466,7 +513,7 @@ export function Application() {
                     className={field}
                     value={data.congregation.id}
                     onChange={(e) => {
-                      clearOfflineSnapshot();
+                      invalidateContext();
                       setData(null);
                       setSelected(
                         choices.find(
@@ -484,7 +531,11 @@ export function Application() {
                 </Label>
               )}
             </div>
-            <main id="conteudo" aria-busy={busy}>
+            <main
+              key={`${data.membership.userId}:${data.congregation.id}:${data.membership.memberId}:${data.membership.role}`}
+              id="conteudo"
+              aria-busy={busy}
+            >
               {!online ? (
                 <Panel>
                   <h1 className="text-2xl font-bold">Você está sem conexão</h1>

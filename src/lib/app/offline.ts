@@ -1,5 +1,6 @@
 import type { WeeklyDocument } from "./weekly-document";
 export const OFFLINE_KEY = "quadro-offline-v1";
+let writeGeneration = 0;
 export const OFFLINE_TTL = 24 * 60 * 60 * 1000;
 export interface OfflineSnapshot {
   version: 1;
@@ -23,6 +24,7 @@ export function snapshotValid(snapshot: OfflineSnapshot, now: number): boolean {
   );
 }
 export function clearOfflineSnapshot() {
+  writeGeneration++;
   try {
     localStorage.removeItem(OFFLINE_KEY);
   } catch {
@@ -67,11 +69,23 @@ async function activateOfflineWorker() {
     throw new Error(
       "A consulta offline exige HTTPS e um navegador com suporte a service worker.",
     );
-  const registration = await navigator.serviceWorker.register("/sw.js");
+  const registration = await navigator.serviceWorker.register("/sw.js", {
+    updateViaCache: "none",
+  });
   await registration.update();
   await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
+    const channels: MessageChannel[] = [];
+    const checked = new Set<ServiceWorker>();
+    function cleanup() {
+      clearTimeout(timer);
       navigator.serviceWorker.removeEventListener("controllerchange", check);
+      channels.forEach((channel) => {
+        channel.port1.close();
+        channel.port2.close();
+      });
+    }
+    const timer = setTimeout(() => {
+      cleanup();
       reject(
         new Error(
           "A consulta offline ainda não está pronta. Mantenha a conexão e tente novamente.",
@@ -79,18 +93,40 @@ async function activateOfflineWorker() {
       );
     }, 10_000);
     function check() {
-      if (navigator.serviceWorker.controller) {
-        clearTimeout(timer);
-        navigator.serviceWorker.removeEventListener("controllerchange", check);
-        resolve();
-      }
+      const controller = navigator.serviceWorker.controller;
+      if (!controller || checked.has(controller)) return;
+      checked.add(controller);
+      const channel = new MessageChannel();
+      channels.push(channel);
+      channel.port1.onmessage = (event) => {
+        if (event.data?.type !== "OFFLINE_READY" || event.data.version !== 3)
+          return;
+        cleanup();
+        if (event.data.ready === true) resolve();
+        else
+          reject(
+            new Error(
+              "Não foi possível preparar os arquivos offline. Reconecte-se e tente novamente.",
+            ),
+          );
+      };
+      controller.postMessage({ type: "OFFLINE_READY" }, [channel.port2]);
     }
     navigator.serviceWorker.addEventListener("controllerchange", check);
     check();
   });
 }
 export async function saveOfflineSnapshot(snapshot: OfflineSnapshot) {
+  const generation = writeGeneration;
   await activateOfflineWorker();
+  if (generation !== writeGeneration)
+    throw new Error(
+      "A cópia foi cancelada porque o acesso ou a semana salva mudou. Entre novamente e salve a semana desejada.",
+    );
+  if (!snapshotValid(snapshot, Date.now()))
+    throw new Error(
+      "A cópia expirou. Atualize o quadro e salve a semana novamente.",
+    );
   try {
     localStorage.setItem(OFFLINE_KEY, JSON.stringify(snapshot));
   } catch {

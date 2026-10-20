@@ -66,3 +66,36 @@ describe("consulta offline", () => {
     expect(map.has(OFFLINE_KEY)).toBe(false);
   });
 });
+
+it("apagar ou sair cancela uma gravação offline ainda aguardando o worker", async () => {
+  const map = new Map<string, string>();
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  vi.stubGlobal("window", { isSecureContext: true });
+  vi.stubGlobal("navigator", {
+    serviceWorker: {
+      register: async () => ({ update: () => pending }),
+      controller: {
+        postMessage: (_data: unknown, ports: MessagePort[]) =>
+          ports[0].postMessage({
+            type: "OFFLINE_READY",
+            version: 3,
+            ready: true,
+          }),
+      },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    },
+  });
+  vi.stubGlobal("localStorage", {
+    setItem: (key: string, value: string) => map.set(key, value),
+    removeItem: (key: string) => map.delete(key),
+  });
+  const { saveOfflineSnapshot, clearOfflineSnapshot } =
+    await import("./offline");
+  const saving = saveOfflineSnapshot(snapshot(Date.now()));
+  clearOfflineSnapshot();
+  release();
+  await expect(saving).rejects.toThrow("cancelada");
+  expect(map.has(OFFLINE_KEY)).toBe(false);
+});

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyDemo, createDemo } from "./demo";
 import {
   conflicts,
@@ -8,6 +8,11 @@ import {
   weekMeetings,
 } from "./domain";
 import { suggest } from "../suggest";
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
+});
+afterEach(() => vi.useRealTimers());
 describe("fluxo semanal", () => {
   it("usa a data civil da congregação em vez do dia UTC", () => {
     expect(localDate("2026-10-22T01:00:00Z", "America/Sao_Paulo")).toBe(
@@ -131,4 +136,58 @@ it("recusa permanece excluída após substituição e não entra na frequência"
   });
   m = d.meetings.find((r) => r.id === m.id)!;
   expect(engineInput(d, m).parts[0].excludedMemberIds).toContain(old.memberId);
+});
+
+it("mudanças de cadastro preservam participações passadas na demonstração", () => {
+  let d = createDemo("2020-01-06");
+  const before = d.assignments.filter((a) => a.memberId === "person-0");
+  expect(before.length).toBeGreaterThan(0);
+  const person = d.members[0];
+  d = applyDemo(d, {
+    type: "member",
+    value: {
+      id: person.id,
+      name: person.name,
+      category: "irma",
+      active: false,
+      isVisitor: false,
+      whatsapp: "",
+    },
+  });
+  expect(
+    d.assignments.filter((a) => a.memberId === person.id).map((a) => a.id),
+  ).toEqual(before.map((a) => a.id));
+});
+
+it("retirar permissão de visitantes do modelo revalida as cópias futuras", () => {
+  let d = createDemo("2035-03-19");
+  const m = weekMeetings(d, "2035-03-19").find(
+      (m) => m.kind === "fim_de_semana",
+    )!,
+    p = m.parts.find((p) => p.allowsVisitor)!;
+  d.members[0].isVisitor = true;
+  d = applyDemo(d, {
+    type: "assignments",
+    meetingId: m.id,
+    revision: m.revision,
+    rows: engineInput(d, m).existing.map((a) => ({
+      ...a,
+      memberId: a.partId === p.id ? d.members[0].id : null,
+    })),
+  });
+  const template = d.templates.find((t) => t.id === m.templateId)!;
+  d = applyDemo(d, {
+    type: "template",
+    isNew: false,
+    value: {
+      ...template,
+      parts: template.parts.map((slot) => ({ ...slot, allowsVisitor: false })),
+    },
+  });
+  expect(
+    d.meetings
+      .find((meeting) => meeting.id === m.id)!
+      .parts.find((part) => part.id === p.id)!.allowsVisitor,
+  ).toBe(false);
+  expect(d.assignments.some((a) => a.partId === p.id)).toBe(false);
 });

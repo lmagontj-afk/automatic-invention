@@ -47,7 +47,7 @@ export function Members({
           </Label>
         </>
       )}
-      {edit !== undefined && (
+      {staff && edit !== undefined && (
         <MemberForm
           key={edit?.id ?? "new"}
           person={edit}

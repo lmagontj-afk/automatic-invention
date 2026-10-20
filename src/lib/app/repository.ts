@@ -29,7 +29,7 @@ async function rows(
   order = "id",
 ): Promise<Row[]> {
   const result: Row[] = [];
-  for (let start = 0; ; start += 1000) {
+  for (let start = 0; ;) {
     const query = client
       .from(table)
       .select("*")
@@ -39,14 +39,31 @@ async function rows(
     const { data, error } = await query;
     if (error) throw error;
     result.push(...data);
-    if (data.length < 1000) return result;
+    if (data.length === 0) return result;
+    start += data.length;
   }
 }
 export async function loadWorkspace(
   client: SupabaseClient,
   selected: Membership,
 ): Promise<Workspace> {
-  const staff = selected.role !== "irmao";
+  // The picker can be stale after an administrator changes this account.
+  const access = await client
+    .from("congregation_memberships")
+    .select("*")
+    .eq("congregation_id", selected.congregationId)
+    .eq("user_id", selected.userId)
+    .maybeSingle();
+  if (access.error) throw access.error;
+  if (!access.data)
+    throw Object.assign(
+      new Error(
+        "Seu vínculo não está disponível. Peça ao administrador para revisar seu acesso.",
+      ),
+      { code: "42501" },
+    );
+  const current = membership(access.data);
+  const staff = current.role !== "irmao";
   const [
     congregations,
     members,
@@ -85,8 +102,25 @@ export async function loadWorkspace(
   ]);
   const c = congregations[0];
   if (!c)
-    throw new Error(
-      "Seu vínculo não está disponível. Peça ao administrador para revisar seu acesso.",
+    throw Object.assign(
+      new Error(
+        "Seu vínculo não está disponível. Peça ao administrador para revisar seu acesso.",
+      ),
+      { code: "42501" },
+    );
+  const verified = memberships
+    .map(membership)
+    .find((m) => m.userId === selected.userId);
+  if (
+    !verified ||
+    verified.role !== current.role ||
+    verified.memberId !== current.memberId
+  )
+    throw Object.assign(
+      new Error(
+        "Seu acesso mudou durante o carregamento. Atualize os dados antes de continuar.",
+      ),
+      { code: "42501" },
     );
   return {
     congregation: {
@@ -94,9 +128,7 @@ export async function loadWorkspace(
       name: text(c, "name"),
       timezone: text(c, "timezone"),
     },
-    membership:
-      memberships.map(membership).find((m) => m.userId === selected.userId) ??
-      selected,
+    membership: verified,
     memberships: memberships.map(membership),
     members: members.map((m) => ({
       id: text(m, "id"),
