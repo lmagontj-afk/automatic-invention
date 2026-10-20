@@ -27,3 +27,11 @@ A configuração npm mantém o cache em `/tmp`, sem exigir escrita no diretório
 - O isolamento das congregações e as permissões devem ser garantidos por RLS no banco, não apenas pela interface.
 - Não instale dependências sem necessidade. Preserve o lockfile com `npm ci`.
 - Não implemente etapas 4+ sem nova solicitação do usuário.
+
+## Banco
+
+- Migrações versionadas em `supabase/migrations`. Nunca aplique o bootstrap de testes em produção.
+- Testes reais de políticas: `npm run test:rls` (Docker disponível; baixa PostgreSQL 17 por digest, cria container efêmero sem rede/portas e o remove ao terminar).
+- `npm test` não exige Docker nem Supabase. Execute também `npm run test:rls` ao alterar migrações/permissões.
+- Clientes Supabase usam a sessão do usuário e a chave pública. Autorize no banco; nenhuma chave privilegiada no app.
+- Cadastros de visitantes também pertencem à congregação anfitriã; `allows_visitor` restringe as partes.
