@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+:root { color-scheme: light; --background: #f7f8fc; --foreground: #172033; --surface: #ffffff; --muted: #49556a; --accent: #4338ca; }
+:root.dark { color-scheme: dark; --background: #101626; --foreground: #edf0f9; --surface: #1c2538; --muted: #bec8dc; --accent: #b1a9ff; }
+@theme inline { --color-background: var(--background); --color-foreground: var(--foreground); --color-surface: var(--surface); --color-muted: var(--muted); --color-accent: var(--accent); }
+body { background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; }
+button, a, input, select { min-height: 44px; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
