@@ -14,6 +14,7 @@ import {
 } from "react";
 import { RequestScope } from "@/lib/app/request-scope";
 import { createClient } from "@/lib/supabase/client";
+import { loginError } from "@/lib/supabase/login-error";
 import { createDemo, applyDemo, brotherView } from "@/lib/app/demo";
 import { friendlyError, localDate, mondayOf } from "@/lib/app/domain";
 import { execute, loadWorkspace, membership } from "@/lib/app/repository";
@@ -270,16 +271,13 @@ export function Application() {
     const form = new FormData(e.currentTarget);
     try {
       const { error } = await client.auth.signInWithPassword({
-        email: String(form.get("email")),
+        email: String(form.get("email")).trim(),
         password: String(form.get("password")),
       });
-      if (error)
-        throw new Error(
-          "Não foi possível entrar. Confira o e-mail e a senha, ou peça ao administrador para revisar sua conta.",
-        );
+      if (error) throw error;
       setMessage("Sessão iniciada.");
     } catch (e) {
-      setError(friendlyError(e));
+      setError(loginError(e));
     } finally {
       setBusy(false);
     }
