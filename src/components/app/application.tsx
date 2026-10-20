@@ -8,7 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { createDemo, applyDemo } from "@/lib/app/demo";
+import { createDemo, applyDemo, brotherView } from "@/lib/app/demo";
 import { friendlyError, localDate, mondayOf } from "@/lib/app/domain";
 import { execute, loadWorkspace, membership } from "@/lib/app/repository";
 import type { Command, Membership, Workspace } from "@/lib/app/types";
@@ -230,6 +230,8 @@ export function Application() {
     );
     setError("");
   }
+  const visibleData =
+    data && demo && data.membership.role === "irmao" ? brotherView(data) : data;
   return (
     <>
       <div className="mx-auto max-w-3xl px-4 pb-28 pt-6 sm:px-6">
@@ -369,6 +371,29 @@ export function Application() {
                   <p className="text-muted">Demonstração · dados fictícios</p>
                 )}
               </div>
+              {demo && (
+                <button
+                  className={secondary}
+                  onClick={() => {
+                    setData({
+                      ...data,
+                      membership: {
+                        ...data.membership,
+                        role:
+                          data.membership.role === "irmao"
+                            ? "administrador"
+                            : "irmao",
+                      },
+                    });
+                    setTab("week");
+                    setMessage("Perfil de demonstração alterado.");
+                  }}
+                >
+                  {data.membership.role === "irmao"
+                    ? "Voltar à administração"
+                    : "Simular perfil de irmão"}
+                </button>
+              )}
               {!demo && (
                 <button
                   className={secondary}
@@ -404,7 +429,7 @@ export function Application() {
             <main id="conteudo" aria-busy={busy}>
               {tab === "week" && (
                 <Week
-                  data={data}
+                  data={visibleData!}
                   monday={monday}
                   setMonday={(date) => setMonday(mondayOf(date))}
                   run={run}
@@ -412,11 +437,11 @@ export function Application() {
                 />
               )}{" "}
               {tab === "members" && (
-                <Members data={data} run={run} busy={busy} />
+                <Members data={visibleData!} run={run} busy={busy} />
               )}{" "}
-              {tab === "history" && <History data={data} />}{" "}
+              {tab === "history" && <History data={visibleData!} />}{" "}
               {tab === "settings" && (
-                <Settings data={data} run={run} busy={busy} />
+                <Settings data={visibleData!} run={run} busy={busy} />
               )}
             </main>
           </>

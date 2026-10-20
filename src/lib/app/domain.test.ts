@@ -54,16 +54,14 @@ describe("fluxo semanal", () => {
       endsOn: "2026-10-21",
     });
     d.assignments.push(
-      ...m.parts
-        .slice(0, 2)
-        .map((p) => ({
-          id: p.id,
-          meetingId: m.id,
-          partId: p.id,
-          memberId: person.id,
-          locked: false,
-          status: "pendente" as const,
-        })),
+      ...m.parts.slice(0, 2).map((p) => ({
+        id: p.id,
+        meetingId: m.id,
+        partId: p.id,
+        memberId: person.id,
+        locked: false,
+        status: "pendente" as const,
+      })),
     );
     expect(conflicts(d, m).some((e) => e.includes("duas vezes"))).toBe(true);
     expect(conflicts(d, m).some((e) => e.includes("indisponível"))).toBe(true);
@@ -99,4 +97,38 @@ describe("fluxo semanal", () => {
     });
     expect(d.assignments.some((r) => r.id === a.id)).toBe(false);
   });
+});
+
+it("recusa permanece excluída após substituição e não entra na frequência", () => {
+  let d = createDemo("2035-03-19");
+  let m = weekMeetings(d, "2035-03-19")[0];
+  const rows = engineInput(d, m).existing.map((a, i) => ({
+    ...a,
+    memberId: i === 0 ? d.membership.memberId : null,
+  }));
+  d = applyDemo(d, {
+    type: "assignments",
+    meetingId: m.id,
+    revision: m.revision,
+    rows,
+  });
+  const old = d.assignments.find((a) => a.meetingId === m.id)!;
+  d = applyDemo(d, {
+    type: "response",
+    assignmentId: old.id,
+    expectedStatus: "pendente",
+    answer: "recusada",
+  });
+  m = d.meetings.find((r) => r.id === m.id)!;
+  expect(engineInput(d, m).parts[0].excludedMemberIds).toContain(old.memberId);
+  d = applyDemo(d, {
+    type: "assignments",
+    meetingId: m.id,
+    revision: m.revision,
+    rows: engineInput(d, m).existing.map((a, i) =>
+      i === 0 ? { ...a, memberId: "person-1" } : a,
+    ),
+  });
+  m = d.meetings.find((r) => r.id === m.id)!;
+  expect(engineInput(d, m).parts[0].excludedMemberIds).toContain(old.memberId);
 });

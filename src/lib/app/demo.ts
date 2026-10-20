@@ -84,6 +84,21 @@ export function applyDemo(workspace: Workspace, command: Command): Workspace {
   const data = structuredClone(workspace),
     cid = data.congregation.id;
   switch (command.type) {
+    case "response": {
+      const a = data.assignments.find((a) => a.id === command.assignmentId);
+      if (!a || a.memberId !== data.membership.memberId)
+        throw new Error("Você só pode responder suas próprias designações.");
+      if (a.status !== command.expectedStatus)
+        throw new Error("A resposta mudou. Atualize e tente novamente.");
+      const m = data.meetings.find((m) => m.id === a.meetingId)!;
+      if (new Date(m.startsAt) <= new Date())
+        throw new Error("Esta reunião já começou.");
+      a.status = command.answer;
+      m.revision++;
+      audit(data, m.id, a.partId, a.memberId!, a.id, "UPDATE", a.status);
+      break;
+    }
+
     case "member": {
       const v = command.value,
         old = data.members.find((m) => m.id === v.id);
@@ -258,4 +273,25 @@ export function createDemo(monday: string): Workspace {
   }
   data.assignments.forEach((a) => (a.status = "confirmada"));
   return applyDemo(data, { type: "week", monday });
+}
+
+/** UI demonstration of the same least-privilege projection imposed by RLS. */
+export function brotherView(data: Workspace): Workspace {
+  const own = data.membership.memberId,
+    assignments = data.assignments.filter((a) => a.memberId === own),
+    meetings = new Set(assignments.map((a) => a.meetingId)),
+    parts = new Set(assignments.map((a) => a.partId));
+  return {
+    ...data,
+    members: data.members
+      .filter((m) => m.id === own)
+      .map((m) => ({ ...m, whatsapp: "" })),
+    memberships: [data.membership],
+    templates: [],
+    assignments,
+    audit: data.audit.filter((a) => a.memberId === own),
+    meetings: data.meetings
+      .filter((m) => meetings.has(m.id))
+      .map((m) => ({ ...m, parts: m.parts.filter((p) => parts.has(p.id)) })),
+  };
 }

@@ -80,20 +80,57 @@ test("mudança de regra limpa uma pessoa inelegível mesmo com trava", async ({
   page,
 }) => {
   await page
-    .getByRole("combobox", { name: "Designado para Demonstração · titular", exact: true })
+    .getByRole("combobox", {
+      name: "Designado para Demonstração · titular",
+      exact: true,
+    })
     .selectOption("person-12");
-  const article = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", { name: /Demonstração · titular/ }),
-    });
+  const article = page.locator("article").filter({
+    has: page.getByRole("heading", { name: /Demonstração · titular/ }),
+  });
   await article.getByRole("checkbox", { name: "Travar parte" }).check();
   await page.getByRole("button", { name: "Salvar reunião" }).first().click();
   await page
-    .getByRole("combobox", { name: "Regra para Demonstração · titular", exact: true })
+    .getByRole("combobox", {
+      name: "Regra para Demonstração · titular",
+      exact: true,
+    })
     .selectOption("somente_anciaos");
   await expect(
-    page.getByRole("combobox", { name: "Designado para Demonstração · titular", exact: true }),
+    page.getByRole("combobox", {
+      name: "Designado para Demonstração · titular",
+      exact: true,
+    }),
   ).toHaveValue("");
   await expect(page.getByRole("status").first()).toContainText("removidos");
+});
+
+test("irmão confirma e recusa; designador vê substitutos", async ({ page }) => {
+  await page.getByRole("button", { name: "Próxima semana" }).click();
+  await page.getByRole("button", { name: "Criar reuniões da semana" }).click();
+  await page
+    .getByRole("combobox", { name: "Designado para Presidente", exact: true })
+    .first()
+    .selectOption("person-0");
+  await page.getByRole("button", { name: "Salvar reunião" }).first().click();
+  await page.getByRole("button", { name: "Simular perfil de irmão" }).click();
+  await expect(
+    page.getByRole("button", { name: "Sugerir designados" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Confirmar participação" }).click();
+  await expect(page.getByText("Confirmada", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Não poderei participar" }).click();
+  await expect(page.getByText("Recusada", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Voltar à administração" }).click();
+  await expect(
+    page.getByText("Caio Exemplo recusou esta parte."),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: /Sugerido:/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Salvar reunião" }).first().click();
+  await expect(page.getByText("Caio Exemplo recusou esta parte.")).toHaveCount(
+    0,
+  );
 });

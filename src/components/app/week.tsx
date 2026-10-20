@@ -21,6 +21,7 @@ import {
   type Workspace,
 } from "@/lib/app/types";
 import { button, Empty, field, Label, Panel, secondary } from "./ui";
+import { ResponseButtons, ReplacementSuggestions } from "./responses";
 import { NotifyLink, WeekNotifications } from "./notifications";
 export type Run = (command: Command, message: string) => Promise<boolean>;
 export function Week({
@@ -96,7 +97,7 @@ export function Week({
       )}
       {meetings.map((m) => (
         <MeetingCard
-          key={`${m.id}-${m.revision}`}
+          key={`${m.id}-${m.revision}-${data.membership.role}-${data.membership.memberId}`}
           data={data}
           meeting={m}
           run={run}
@@ -328,6 +329,23 @@ export function MeetingCard({
                       ? "Recusada"
                       : "Aguardando confirmação"}
                 </p>
+              )}
+              {stored && (
+                <ResponseButtons
+                  data={data}
+                  assignment={stored}
+                  meeting={m}
+                  run={run}
+                  busy={busy}
+                />
+              )}
+              {staff && stored?.status === "recusada" && (
+                <ReplacementSuggestions
+                  data={preview}
+                  meeting={m}
+                  assignment={stored}
+                  choose={(id) => choose(p.id, id)}
+                />
               )}
               {staff &&
                 stored?.status === "pendente" &&

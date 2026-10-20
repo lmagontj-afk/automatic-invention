@@ -169,6 +169,13 @@ export async function execute(
 ) {
   let result: { error: unknown };
   switch (command.type) {
+    case "response":
+      result = await client.rpc("respond_assignment", {
+        aid: command.assignmentId,
+        expected_status: command.expectedStatus,
+        answer: command.answer,
+      });
+      break;
     case "member": {
       const v = command.value;
       result = await client.rpc("save_member", {
@@ -230,14 +237,12 @@ export async function execute(
         .single();
       break;
     case "availability":
-      result = await client
-        .from("unavailability")
-        .insert({
-          congregation_id: cid,
-          member_id: command.memberId,
-          starts_on: command.startsOn,
-          ends_on: command.endsOn,
-        });
+      result = await client.from("unavailability").insert({
+        congregation_id: cid,
+        member_id: command.memberId,
+        starts_on: command.startsOn,
+        ends_on: command.endsOn,
+      });
       break;
     case "removeAvailability":
       result = await client
@@ -250,17 +255,15 @@ export async function execute(
       break;
     case "membership": {
       const v = command.value;
-      result = await client
-        .from("congregation_memberships")
-        .upsert(
-          {
-            congregation_id: cid,
-            user_id: v.userId,
-            member_id: v.memberId,
-            role: v.role,
-          },
-          { onConflict: "congregation_id,user_id" },
-        );
+      result = await client.from("congregation_memberships").upsert(
+        {
+          congregation_id: cid,
+          user_id: v.userId,
+          member_id: v.memberId,
+          role: v.role,
+        },
+        { onConflict: "congregation_id,user_id" },
+      );
       break;
     }
   }

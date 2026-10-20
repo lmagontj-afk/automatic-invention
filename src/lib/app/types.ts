@@ -73,6 +73,12 @@ export interface MemberDraft {
   whatsapp: string;
 }
 export type Command =
+  | {
+      type: "response";
+      assignmentId: string;
+      expectedStatus: Status;
+      answer: "confirmada" | "recusada";
+    }
   | { type: "member"; value: MemberDraft }
   | { type: "template"; value: Template; isNew: boolean }
   | { type: "week"; monday: string }

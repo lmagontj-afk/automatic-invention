@@ -134,3 +134,11 @@ Os testes Playwright exercitam os fluxos em Chromium com viewport de celular. Us
 Depois de salvar, use **Abrir WhatsApp** junto a uma designação pendente, ou **Avisar todos da semana** para abrir uma lista agrupada por pessoa. Cadastre país + DDD + telefone em Irmãos. Os links `wa.me` incluem nome, parte, reunião, dia/data/horário locais e pedido de confirmação. Telefones ausentes/invalidos indicam o cadastro a corrigir.
 
 Cada conversa é aberta por uma ação sua. Revise e envie no WhatsApp. Abrir um link não comprova envio nem muda o status da designação. A lista inclui só pendentes; o app não faz disparos automáticos. `NotificationTransport`, em `src/lib/notifications`, isola a preparação da ação do provedor. Uma futura integração oficial deverá implementar um adaptador e endpoint autenticado no servidor; chaves dessa API nunca devem ir ao navegador.
+
+## Confirmação e recusa (etapa 6)
+
+Aplique `202610200003_responses.sql`. Na tela Semana, cada pessoa logada pode confirmar ou recusar suas próprias designações antes do início da reunião. A RPC verifica identidade, congregação, designação atual e status esperado. Ela só altera o status; o perfil irmão continua sem permissão geral de atualizar designações. Respostas e substituições ficam na auditoria.
+
+O designador vê recusas e até três substitutos elegíveis, respeitando disponibilidade, ocupação na reunião e histórico. Escolher um substituto altera o rascunho; **salve a reunião**. A nova designação começa pendente. Recusas anteriores para aquela parte continuam excluídas após substituição. Uma trava manual incompatível com uma recusa deve ser revisada, sem substituição automática.
+
+Na demonstração, **Simular perfil de irmão** permite experimentar a visão restrita e responder como Caio Exemplo. Volte à administração para testar a substituição. Isso só simula dados fictícios; permissões reais são exercidas pelos testes SQL com o papel `authenticated`.

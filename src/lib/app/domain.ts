@@ -48,6 +48,7 @@ export function engineInput(data: Workspace, meeting: Meeting): SuggestInput {
       ...p,
       congregationId: data.congregation.id,
       meetingId: meeting.id,
+      excludedMemberIds: declinedMembers(data, p.id),
     })),
     members: data.members,
     existing: meeting.parts.map((p) => {
@@ -119,4 +120,29 @@ export function friendlyError(error: unknown) {
     e.message ||
     "Não foi possível concluir. Atualize os dados e tente novamente."
   );
+}
+
+/** Latest event per assignment, including removed refusals, survives replacements. */
+export function declinedMembers(data: Workspace, partId: string): string[] {
+  const latest = new Map<string, Workspace["audit"][number]>();
+  for (const event of data.audit.filter((a) => a.partId === partId)) {
+    const previous = latest.get(event.assignmentId);
+    if (!previous || event.occurredAt >= previous.occurredAt)
+      latest.set(event.assignmentId, event);
+  }
+  return [
+    ...new Set(
+      [...latest.values()]
+        .filter((a) => a.status === "recusada")
+        .map((a) => a.memberId)
+        .concat(
+          data.assignments
+            .filter(
+              (a) =>
+                a.partId === partId && a.status === "recusada" && a.memberId,
+            )
+            .map((a) => a.memberId!),
+        ),
+    ),
+  ];
 }

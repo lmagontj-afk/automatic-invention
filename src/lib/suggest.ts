@@ -20,6 +20,8 @@ export interface Part {
   meetingId: string;
   eligibility: EligibilityRule;
   allowsVisitor?: boolean;
+  /** Explicit per-slot refusals or other exclusions; never override eligibility. */
+  excludedMemberIds?: readonly string[];
 }
 export interface Assignment { partId: string; memberId: string | null; locked: boolean }
 /** One row per actual assignment, NOT one row per audit event. */
@@ -72,6 +74,7 @@ export function isEligible(category: Category, rule: EligibilityRule): boolean {
 function invalidReason(member: Member | undefined, part: Part, date: string): ConflictCode | null {
   if (!member) return "member_missing";
   if (!member.active) return "inactive";
+  if (part.excludedMemberIds?.includes(member.id)) return "ineligible";
   if (!isEligible(member.category, part.eligibility) || (member.isVisitor && !part.allowsVisitor)) return "ineligible";
   if (member.unavailability.some(range => range.startsOn <= date && date <= range.endsOn)) return "unavailable";
   return null;
