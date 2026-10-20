@@ -58,3 +58,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Exportação e offline
+
+- O conteúdo exportado e o documento do snapshot devem usar a projeção explícita em `weekly-document.ts`, sem telefones, tokens, perfis ou auditoria. Metadados de escopo (usuário, congregação e perfil) ficam fora do documento para invalidar a cópia ao trocar de acesso. O irmão só pode exportar suas próprias partes.
+- PDF usa a impressão do navegador; PNG usa Canvas. Não adicione bibliotecas pesadas apenas para captura.
+- A cópia offline requer consentimento, expira em 24h, é somente leitura e deve ser apagada ao sair/trocar conta, congregação ou perfil. Não faça cache de respostas Supabase ou rotas de autenticação.
+- O service worker guarda só arquivos públicos do visualizador. Ao mudar os arquivos estáticos offline, aumente a versão `quadro-shell-*` em `public/sw.js` para invalidar o cache anterior.
+- `npm run test:e2e` precisa continuar verificando perda de rede real no contexto do navegador, expiração, exclusão e exportação, além dos fluxos de designação.

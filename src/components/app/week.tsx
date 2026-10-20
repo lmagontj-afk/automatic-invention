@@ -21,6 +21,7 @@ import {
   type Workspace,
 } from "@/lib/app/types";
 import { button, Empty, field, Label, Panel, secondary } from "./ui";
+import { WeekTools } from "./week-tools";
 import { ResponseButtons, ReplacementSuggestions } from "./responses";
 import { NotifyLink, WeekNotifications } from "./notifications";
 export type Run = (command: Command, message: string) => Promise<boolean>;
@@ -92,6 +93,7 @@ export function Week({
             : "Você não tem designações nesta semana. Use as setas para consultar outras semanas."}
         </Empty>
       )}
+      <WeekTools data={data} monday={monday} />
       {staff && (
         <WeekNotifications data={data} meetingIds={meetings.map((m) => m.id)} />
       )}

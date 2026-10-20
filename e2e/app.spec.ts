@@ -134,3 +134,91 @@ test("irmão confirma e recusa; designador vê substitutos", async ({ page }) =>
     0,
   );
 });
+
+test("exporta PNG e abre quadro de impressão sem telefones", async ({
+  page,
+}) => {
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Baixar imagem" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^quadro-.*\.png$/);
+  const path = await file.path();
+  const { readFileSync } = await import("node:fs");
+  const bytes = readFileSync(path!);
+  expect(bytes.subarray(1, 4).toString()).toBe("PNG");
+  expect(bytes.length).toBeGreaterThan(1000);
+  const pending = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Exportar PDF" }).click();
+  const popup = await pending;
+  await expect(
+    popup.getByRole("heading", { name: "Quadro semanal", exact: true }),
+  ).toBeVisible();
+  await expect(
+    popup.getByRole("button", { name: "Salvar como PDF / imprimir" }),
+  ).toBeVisible();
+  expect(await popup.locator("body").innerText()).not.toContain("WhatsApp");
+  await popup.close();
+});
+test("consulta offline funciona após perder a rede e permite apagar a cópia", async ({
+  page,
+  context,
+}) => {
+  await page.getByText("Consultar sem internet", { exact: true }).click();
+  await page
+    .getByRole("checkbox", { name: /Este dispositivo é de confiança/ })
+    .check();
+  await page.getByRole("button", { name: "Salvar semana offline" }).click();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Semana salva para consulta offline" }),
+  ).toBeVisible();
+  const raw = await page.evaluate(() =>
+    localStorage.getItem("quadro-offline-v1"),
+  );
+  expect(raw).not.toContain("whatsapp");
+  await context.setOffline(true);
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Quadro salvo", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/somente leitura/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Salvar reunião" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Apagar cópia deste dispositivo" })
+    .click();
+  await expect(page.getByRole("status")).toContainText("apagada");
+  await context.setOffline(false);
+});
+test("sair apaga a cópia offline e uma cópia expirada não exibe nomes", async ({
+  page,
+}) => {
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "quadro-offline-v1",
+      JSON.stringify({
+        version: 1,
+        userId: "demo-user",
+        congregationId: "demo",
+        role: "administrador",
+        createdAt: Date.now() - 10000,
+        expiresAt: Date.now() - 1,
+        document: { congregation: "Nome que não deve aparecer", meetings: [] },
+      }),
+    ),
+  );
+  await page.goto("/offline.html");
+  await expect(page.getByText(/A cópia expirou/)).toBeVisible();
+  await expect(page.getByText("Nome que não deve aparecer")).toHaveCount(0);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Abrir demonstração" }).click();
+  await page.evaluate(() =>
+    localStorage.setItem("quadro-offline-v1", "marcador"),
+  );
+  await page.getByRole("button", { name: "Sair", exact: true }).click();
+  expect(
+    await page.evaluate(() => localStorage.getItem("quadro-offline-v1")),
+  ).toBeNull();
+});

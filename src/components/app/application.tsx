@@ -1,4 +1,9 @@
 "use client";
+import {
+  clearOfflineSnapshot,
+  retainSnapshotForUser,
+  retainSnapshotForScope,
+} from "@/lib/app/offline";
 import Link from "next/link";
 import {
   useCallback,
@@ -25,6 +30,7 @@ const navigation = [
 ] as const;
 export function Application() {
   const lastUser = useRef<string | null>(null);
+  const errorPanel = useRef<HTMLDivElement>(null);
   const [client] = useState(() =>
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
@@ -40,7 +46,20 @@ export function Application() {
     [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [tab, setTab] = useState<(typeof navigation)[number][0]>("week"),
-    [monday, setMonday] = useState("");
+    [monday, setMonday] = useState(""),
+    [online, setOnline] = useState(true);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  useEffect(() => {
+    if (error) errorPanel.current?.focus();
+  }, [error]);
   useEffect(() => {
     if (!client) return;
     void client.auth
@@ -50,6 +69,7 @@ export function Application() {
       data: { subscription },
     } = client.auth.onAuthStateChange((_event, session) => {
       const next = session?.user.id ?? null;
+      retainSnapshotForUser(next);
       if (next !== lastUser.current) {
         setData(null);
         setSelected(null);
@@ -91,6 +111,11 @@ export function Application() {
     setError("");
     try {
       const next = await loadWorkspace(client, selected);
+      retainSnapshotForScope(
+        next.membership.userId,
+        next.congregation.id,
+        next.membership.role,
+      );
       setData(next);
     } catch (e) {
       setError(friendlyError(e));
@@ -104,6 +129,11 @@ export function Application() {
     void loadWorkspace(client, selected)
       .then((next) => {
         if (!cancelled) {
+          retainSnapshotForScope(
+            next.membership.userId,
+            next.congregation.id,
+            next.membership.role,
+          );
           setData(next);
           setMonday(
             mondayOf(
@@ -146,6 +176,12 @@ export function Application() {
     };
   }, [client, selected, demo]);
   async function run(command: Command, success: string) {
+    if (!online) {
+      setError(
+        "Sem conexão. Use a cópia offline para consultar e reconecte-se antes de editar.",
+      );
+      return false;
+    }
     if (!data || busy) return false;
     setBusy(true);
     setError("");
@@ -157,7 +193,13 @@ export function Application() {
           throw new Error("Entre novamente para salvar.");
         await execute(client, data.congregation.id, command);
         try {
-          setData(await loadWorkspace(client, selected));
+          const next = await loadWorkspace(client, selected);
+          retainSnapshotForScope(
+            next.membership.userId,
+            next.congregation.id,
+            next.membership.role,
+          );
+          setData(next);
         } catch (e) {
           setError(
             `A alteração foi salva, mas os dados não puderam ser atualizados. Use Atualizar antes de editar novamente. ${friendlyError(e)}`,
@@ -199,6 +241,7 @@ export function Application() {
     }
   }
   async function logout() {
+    clearOfflineSnapshot();
     if (client && !demo) {
       setBusy(true);
       const { error } = await client.auth.signOut();
@@ -219,6 +262,7 @@ export function Application() {
     setBusy(false);
   }
   function startDemo() {
+    clearOfflineSnapshot();
     const week = mondayOf(
       localDate(new Date().toISOString(), "America/Sao_Paulo"),
     );
@@ -263,15 +307,27 @@ export function Application() {
           aria-live="polite"
           className={
             message
-              ? "mb-4 rounded-xl border border-accent/30 bg-accent/5 p-4"
+              ? "sticky top-3 z-20 mb-4 flex items-center gap-3 rounded-xl border border-accent/40 bg-surface p-4 shadow-lg"
               : "sr-only"
           }
         >
-          {message}
+          <span className="flex-1">{message}</span>
+          {message && (
+            <button
+              type="button"
+              aria-label="Fechar aviso"
+              className="min-w-11 rounded-lg font-bold text-accent"
+              onClick={() => setMessage("")}
+            >
+              ×
+            </button>
+          )}
         </div>
         {error && (
           <div
             role="alert"
+            ref={errorPanel}
+            tabIndex={-1}
             className="mb-4 rounded-xl border border-red-700 bg-red-50 p-4 text-red-900 dark:bg-red-950 dark:text-red-100"
           >
             {error}
@@ -375,6 +431,7 @@ export function Application() {
                 <button
                   className={secondary}
                   onClick={() => {
+                    clearOfflineSnapshot();
                     setData({
                       ...data,
                       membership: {
@@ -409,6 +466,7 @@ export function Application() {
                     className={field}
                     value={data.congregation.id}
                     onChange={(e) => {
+                      clearOfflineSnapshot();
                       setData(null);
                       setSelected(
                         choices.find(
@@ -427,21 +485,36 @@ export function Application() {
               )}
             </div>
             <main id="conteudo" aria-busy={busy}>
-              {tab === "week" && (
-                <Week
-                  data={visibleData!}
-                  monday={monday}
-                  setMonday={(date) => setMonday(mondayOf(date))}
-                  run={run}
-                  busy={busy}
-                />
-              )}{" "}
-              {tab === "members" && (
-                <Members data={visibleData!} run={run} busy={busy} />
-              )}{" "}
-              {tab === "history" && <History data={visibleData!} />}{" "}
-              {tab === "settings" && (
-                <Settings data={visibleData!} run={run} busy={busy} />
+              {!online ? (
+                <Panel>
+                  <h1 className="text-2xl font-bold">Você está sem conexão</h1>
+                  <p className="my-3 text-muted">
+                    As alterações estão pausadas. Consulte a cópia salva e
+                    reconecte-se para atualizar o quadro.
+                  </p>
+                  <a className={secondary} href="/offline.html">
+                    Consultar cópia offline
+                  </a>
+                </Panel>
+              ) : (
+                <>
+                  {tab === "week" && (
+                    <Week
+                      data={visibleData!}
+                      monday={monday}
+                      setMonday={(date) => setMonday(mondayOf(date))}
+                      run={run}
+                      busy={busy}
+                    />
+                  )}{" "}
+                  {tab === "members" && (
+                    <Members data={visibleData!} run={run} busy={busy} />
+                  )}{" "}
+                  {tab === "history" && <History data={visibleData!} />}{" "}
+                  {tab === "settings" && (
+                    <Settings data={visibleData!} run={run} busy={busy} />
+                  )}
+                </>
               )}
             </main>
           </>
