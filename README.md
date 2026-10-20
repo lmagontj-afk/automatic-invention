@@ -128,3 +128,9 @@ npm run test:e2e
 ```
 
 Os testes Playwright exercitam os fluxos em Chromium com viewport de celular. Use o Chromium instalado ou `npx playwright install chromium` (Linux pode precisar de `npx playwright install --with-deps chromium`). Para indicar outro executável, defina `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Os testes de UI usam a demonstração; autorização e transações são exercitadas separadamente no PostgreSQL. O login HTTP no Supabase hospedado precisa ser validado após configurar seu projeto.
+
+## Avisos WhatsApp (etapa 5)
+
+Depois de salvar, use **Abrir WhatsApp** junto a uma designação pendente, ou **Avisar todos da semana** para abrir uma lista agrupada por pessoa. Cadastre país + DDD + telefone em Irmãos. Os links `wa.me` incluem nome, parte, reunião, dia/data/horário locais e pedido de confirmação. Telefones ausentes/invalidos indicam o cadastro a corrigir.
+
+Cada conversa é aberta por uma ação sua. Revise e envie no WhatsApp. Abrir um link não comprova envio nem muda o status da designação. A lista inclui só pendentes; o app não faz disparos automáticos. `NotificationTransport`, em `src/lib/notifications`, isola a preparação da ação do provedor. Uma futura integração oficial deverá implementar um adaptador e endpoint autenticado no servidor; chaves dessa API nunca devem ir ao navegador.

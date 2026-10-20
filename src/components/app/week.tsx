@@ -21,6 +21,7 @@ import {
   type Workspace,
 } from "@/lib/app/types";
 import { button, Empty, field, Label, Panel, secondary } from "./ui";
+import { NotifyLink, WeekNotifications } from "./notifications";
 export type Run = (command: Command, message: string) => Promise<boolean>;
 export function Week({
   data,
@@ -89,6 +90,9 @@ export function Week({
             ? "Nenhuma reunião nesta semana. Configure os modelos em Ajustes e crie as reuniões acima."
             : "Você não tem designações nesta semana. Use as setas para consultar outras semanas."}
         </Empty>
+      )}
+      {staff && (
+        <WeekNotifications data={data} meetingIds={meetings.map((m) => m.id)} />
       )}
       {meetings.map((m) => (
         <MeetingCard
@@ -325,6 +329,26 @@ export function MeetingCard({
                       : "Aguardando confirmação"}
                 </p>
               )}
+              {staff &&
+                stored?.status === "pendente" &&
+                person &&
+                stored.memberId === a.memberId && (
+                  <NotifyLink
+                    notice={{
+                      memberId: person.id,
+                      name: person.name,
+                      phone: person.whatsapp,
+                      timezone: data.congregation.timezone,
+                      items: [
+                        {
+                          part: p.title,
+                          meeting: m.title,
+                          startsAt: m.startsAt,
+                        },
+                      ],
+                    }}
+                  />
+                )}
             </article>
           );
         })}
